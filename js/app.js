@@ -22,7 +22,6 @@ function bindEvents() {
   document.getElementById('input-date-start').addEventListener('input', onUserDataChange);
   document.getElementById('input-date-end').addEventListener('input', onUserDataChange);
   document.getElementById('input-semester').addEventListener('input', onUserDataChange);
-  document.getElementById('input-study-year').addEventListener('input', onUserDataChange);
 
   document.getElementById('btn-generate').addEventListener('click', handleGenerate);
 }
@@ -35,7 +34,6 @@ function loadSavedData() {
     document.getElementById('input-date-start').value = saved.userData.dateStart || '';
     document.getElementById('input-date-end').value = saved.userData.dateEnd || '';
     document.getElementById('input-semester').value = saved.userData.semester || 1;
-    document.getElementById('input-study-year').value = saved.userData.studyYear || 1;
   }
   if (saved.scoreItems) {
     appState.scoreItems = saved.scoreItems;
@@ -47,16 +45,20 @@ function loadSavedData() {
 function onUserDataChange() {
   const userData = getUserData();
   Storage.save({ userData });
+  if (appState.scoreItems.length) {
+    recalculateAll();
+  }
 }
 
 function getUserData() {
+  const semester = parseInt(document.getElementById('input-semester').value) || 1;
   return {
     studentFio: document.getElementById('input-student-fio').value.trim(),
     supervisorFio: document.getElementById('input-supervisor-fio').value.trim(),
     dateStart: document.getElementById('input-date-start').value.trim(),
     dateEnd: document.getElementById('input-date-end').value.trim(),
-    semester: parseInt(document.getElementById('input-semester').value) || 1,
-    studyYear: parseInt(document.getElementById('input-study-year').value) || 1
+    semester: semester,
+    studyYear: semester <= 2 ? 1 : 2
   };
 }
 
