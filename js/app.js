@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadSavedData();
   bindEvents();
   if (location.protocol !== 'file:') {
-    setTimeout(() => handleLoadFromFolder(true), 300);
+    setTimeout(() => handleLoadFromFolder(), 300);
   }
 });
 
