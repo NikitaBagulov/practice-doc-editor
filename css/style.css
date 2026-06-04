@@ -345,6 +345,18 @@ section h2 {
   padding: 8px 0;
 }
 
+.result-reason {
+  background: #fff3e0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border-bottom: none;
+}
+
+.result-reason .result-label {
+  color: #bf360c;
+}
+
 /* Responsive */
 @media (max-width: 700px) {
   .upload-grid,

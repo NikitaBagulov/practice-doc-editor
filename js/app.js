@@ -360,6 +360,42 @@ function renderResults(stageSums, stageResults, compTotals, compLevels, totalSum
   item.appendChild(val);
 
   finalDiv.appendChild(item);
+
+  if (final === 'не зачтено') {
+    const reasons = [];
+
+    const failedStages = Object.entries(stageResults).filter(([, r]) => r !== 'зачтено').map(([s]) => stageNames[s]);
+    if (failedStages.length) {
+      reasons.push('не зачтено по этапам: ' + failedStages.join(', '));
+    }
+
+    if (sem === 1) {
+      const bad = Object.entries(compLevels).filter(([, l]) => l === 'не сформирована').map(([c]) => c);
+      if (bad.length >= 3) {
+        reasons.push('не сформированы компетенции (3 и более): ' + bad.join(', '));
+      }
+    } else if (sem === 2) {
+      const bad = Object.entries(compLevels).filter(([, l]) => l === 'не сформирована' || l === 'сформирована на базовом уровне 1').map(([c]) => c);
+      if (bad.length >= 3) {
+        reasons.push('не сформированы или базовый уровень 1 (3 и более): ' + bad.join(', '));
+      }
+    } else if (sem === 3) {
+      const bad = Object.entries(compLevels).filter(([, l]) => l !== 'сформирована').map(([c]) => c);
+      if (bad.length) {
+        reasons.push('не все компетенции сформированы: ' + bad.join(', '));
+      }
+    }
+
+    if (reasons.length) {
+      const reasonDiv = document.createElement('div');
+      reasonDiv.className = 'result-item result-reason';
+      const reasonLabel = document.createElement('span');
+      reasonLabel.className = 'result-label';
+      reasonLabel.textContent = 'Причина: ' + reasons.join('; ') + '.';
+      reasonDiv.appendChild(reasonLabel);
+      finalDiv.appendChild(reasonDiv);
+    }
+  }
 }
 
 const MONTHS_GENITIVE = {
