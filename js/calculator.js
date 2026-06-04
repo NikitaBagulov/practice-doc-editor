@@ -57,14 +57,24 @@ const Calculator = {
     return levels;
   },
 
-  computeFinalResult(stageResults, compLevels, rules) {
-    if (rules.require_all_stages_passed) {
-      for (const stage of ['P', 'O', 'Z']) {
-        if (stageResults[stage] !== 'зачтено') return 'не зачтено';
-      }
+  computeFinalResult(stageResults, compLevels, semester, rules) {
+    for (const stage of ['P', 'O', 'Z']) {
+      if (stageResults[stage] !== 'зачтено') return 'не зачтено';
     }
-    const okCount = Object.values(compLevels).filter(l => l !== 'не сформирована').length;
-    return okCount >= (rules.min_ok_competences || 0) ? 'зачтено' : 'не зачтено';
+
+    const levels = Object.values(compLevels);
+
+    if (semester === 1) {
+      const ok = levels.filter(l => l !== 'не сформирована').length;
+      return ok >= 6 ? 'зачтено' : 'не зачтено';
+    } else if (semester === 2) {
+      const ok = levels.filter(l => l === 'сформирована' || l === 'сформирована на базовом уровне 2').length;
+      return ok >= 6 ? 'зачтено' : 'не зачтено';
+    } else if (semester === 3) {
+      return levels.every(l => l === 'сформирована') ? 'зачтено' : 'не зачтено';
+    }
+
+    return 'не зачтено';
   },
 
   buildScoreMapByRowKey(scoreItems) {

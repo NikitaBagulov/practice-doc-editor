@@ -280,7 +280,7 @@ function recalculateAll() {
 
   // 3. Final result
   const rules = semConfig.final_rules || {};
-  const final = Calculator.computeFinalResult(stageResults, compLevels, rules);
+  const final = Calculator.computeFinalResult(stageResults, compLevels, semester, rules);
 
   renderResults(stageSums, stageResults, compTotals, compLevels, totalSum, final);
 }
@@ -403,7 +403,7 @@ async function handleGenerate() {
     const compTotals = Calculator.computeCompetenceTotals(appState.compRows, scoreByScoreKey);
     const compLevels = Calculator.computeCompetenceLevels(compTotals, String(semester), PRACTICE_CONFIG);
     const totalSum = Object.values(compTotals).reduce((a, b) => a + b, 0);
-    const final = Calculator.computeFinalResult(stageResults, compLevels, semConfig.final_rules || {});
+    const final = Calculator.computeFinalResult(stageResults, compLevels, semester, semConfig.final_rules || {});
 
     // Base mapping for all docs
     const baseMapping = {
