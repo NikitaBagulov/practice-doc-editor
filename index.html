@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Редактор документов практики</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Редактор документов производственной практики</h1>
+    </header>
+
+    <section id="section-upload">
+      <h2>1. Загрузка шаблонов</h2>
+      <div class="upload-tip">
+        <button id="btn-load-folder" class="btn btn-primary">Загрузить из папки templates</button>
+        <span class="tip-text">Автоматическая загрузка (если шаблоны есть на сервере)</span>
+      </div>
+      <div class="upload-divider"><span>или вручную:</span></div>
+      <div class="upload-grid">
+        <div class="upload-item">
+          <label>Оценочный лист:</label>
+          <input type="file" id="file-eval" accept=".docx">
+        </div>
+        <div class="upload-item">
+          <label>Лист компетенций:</label>
+          <input type="file" id="file-comp" accept=".docx">
+        </div>
+        <div class="upload-item">
+          <label>Отзыв:</label>
+          <input type="file" id="file-review" accept=".docx">
+        </div>
+        <div class="upload-item">
+          <label>Индивидуальное задание:</label>
+          <input type="file" id="file-task" accept=".docx">
+        </div>
+        <div class="upload-item">
+          <label>План-график:</label>
+          <input type="file" id="file-plan" accept=".docx">
+        </div>
+        <div class="upload-item">
+          <label>config.json:</label>
+          <input type="file" id="file-config" accept=".json">
+        </div>
+      </div>
+      <div class="upload-tip">
+        <button id="btn-load-all" class="btn btn-primary">Загрузить выбранные файлы</button>
+        <span class="tip-text">Выберите все 6 файлов выше, затем нажмите кнопку</span>
+      </div>
+      <div id="upload-status" class="status-msg"></div>
+    </section>
+
+    <section id="section-data">
+      <h2>2. Данные магистранта</h2>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="input-student-fio">ФИО магистранта:</label>
+          <input type="text" id="input-student-fio" placeholder="Иванов Иван Иванович">
+        </div>
+        <div class="form-field">
+          <label for="input-supervisor-fio">ФИО руководителя:</label>
+          <input type="text" id="input-supervisor-fio" placeholder="Петров Пётр Петрович">
+        </div>
+        <div class="form-field">
+          <label for="input-date-start">Дата начала:</label>
+          <input type="text" id="input-date-start" placeholder="01.09.2025">
+        </div>
+        <div class="form-field">
+          <label for="input-date-end">Дата окончания:</label>
+          <input type="text" id="input-date-end" placeholder="30.12.2025">
+        </div>
+        <div class="form-field form-field-narrow">
+          <label for="input-semester">Семестр:</label>
+          <input type="number" id="input-semester" value="1" min="1" max="3">
+        </div>
+        <div class="form-field form-field-narrow">
+          <label for="input-study-year">Год обучения:</label>
+          <input type="number" id="input-study-year" value="1" min="1" max="2">
+        </div>
+      </div>
+    </section>
+
+    <section id="section-scores">
+      <h2>3. Баллы <span id="section-scores-note" class="note"></span></h2>
+      <div id="scores-container">
+        <p class="placeholder-msg">Загрузите шаблон оценочного листа, чтобы появились поля для баллов.</p>
+      </div>
+    </section>
+
+    <section id="section-results">
+      <h2>4. Результаты</h2>
+      <div id="results-container">
+        <div id="results-stage">
+          <h3>Этапы практики</h3>
+          <div id="stage-results"></div>
+        </div>
+        <div id="results-competence">
+          <h3>Компетенции</h3>
+          <div id="comp-results"></div>
+        </div>
+        <div id="results-final">
+          <h3>Итог практики</h3>
+          <div id="final-result"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="section-generate">
+      <button id="btn-generate" class="btn btn-primary btn-large">Сформировать документы</button>
+      <div id="generate-status" class="status-msg"></div>
+    </section>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/templateLoader.js"></script>
+  <script src="js/calculator.js"></script>
+  <script src="js/docxBuilder.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
