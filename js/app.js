@@ -395,6 +395,79 @@ function formatDate(dateStr) {
   return month ? '«' + d + '» ' + month + ' ' + y + ' г.' : dateStr;
 }
 
+function detectFioGender(parts) {
+  const patronymic = (parts[2] || '').toLowerCase();
+  if (patronymic.endsWith('вна') || patronymic.endsWith('чна')) return 'female';
+  if (patronymic.endsWith('ич')) return 'male';
+
+  const firstName = (parts[1] || '').toLowerCase();
+  return /[ая]$/.test(firstName) ? 'female' : 'male';
+}
+
+function replaceEnding(word, ending, replacement) {
+  return word.slice(0, word.length - ending.length) + replacement;
+}
+
+function declineLastName(word, gender, grammaticalCase) {
+  const lower = word.toLowerCase();
+  const isGenitive = grammaticalCase === 'genitive';
+
+  if (gender === 'female') {
+    if (/(ова|ева|ёва|ина|ына)$/.test(lower)) return word + 'ой';
+    if (lower.endsWith('ая')) return replaceEnding(word, 'ая', isGenitive ? 'ой' : 'ой');
+    if (lower.endsWith('яя')) return replaceEnding(word, 'яя', isGenitive ? 'ей' : 'ей');
+    if (lower.endsWith('а')) return replaceEnding(word, 'а', isGenitive ? 'ы' : 'е');
+    if (lower.endsWith('я')) return replaceEnding(word, 'я', isGenitive ? 'и' : 'е');
+    return word;
+  }
+
+  if (lower.endsWith('ский')) return replaceEnding(word, 'ский', isGenitive ? 'ского' : 'скому');
+  if (lower.endsWith('цкий')) return replaceEnding(word, 'цкий', isGenitive ? 'цкого' : 'цкому');
+  if (lower.endsWith('ой')) return replaceEnding(word, 'ой', isGenitive ? 'ого' : 'ому');
+  if (/(ов|ев|ёв|ин|ын)$/.test(lower)) return word + (isGenitive ? 'а' : 'у');
+  if (lower.endsWith('й') || lower.endsWith('ь')) return word.slice(0, -1) + (isGenitive ? 'я' : 'ю');
+  if (lower.endsWith('а')) return word.slice(0, -1) + (isGenitive ? 'ы' : 'е');
+  if (lower.endsWith('я')) return word.slice(0, -1) + (isGenitive ? 'и' : 'е');
+  if (/[бвгджзклмнпрстфхцчшщ]$/.test(lower)) return word + (isGenitive ? 'а' : 'у');
+  return word;
+}
+
+function declineFirstName(word, gender, grammaticalCase) {
+  const lower = word.toLowerCase();
+  const isGenitive = grammaticalCase === 'genitive';
+
+  if (lower.endsWith('й') || lower.endsWith('ь')) return word.slice(0, -1) + (isGenitive ? 'я' : 'ю');
+  if (lower.endsWith('а')) return word.slice(0, -1) + (isGenitive ? 'ы' : 'е');
+  if (lower.endsWith('я')) return word.slice(0, -1) + (isGenitive ? 'и' : 'е');
+  if (gender === 'male' && /[бвгджзклмнпрстфхцчшщ]$/.test(lower)) {
+    return word + (isGenitive ? 'а' : 'у');
+  }
+  return word;
+}
+
+function declinePatronymic(word, grammaticalCase) {
+  const lower = word.toLowerCase();
+  const isGenitive = grammaticalCase === 'genitive';
+
+  if (lower.endsWith('ич')) return word + (isGenitive ? 'а' : 'у');
+  if (lower.endsWith('на')) return word.slice(0, -1) + (isGenitive ? 'ы' : 'е');
+  return word;
+}
+
+function declineFullName(fio, grammaticalCase) {
+  const parts = fio.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return fio;
+
+  const gender = detectFioGender(parts);
+  const declined = parts.slice();
+
+  declined[0] = declineLastName(parts[0], gender, grammaticalCase);
+  declined[1] = declineFirstName(parts[1], gender, grammaticalCase);
+  if (parts[2]) declined[2] = declinePatronymic(parts[2], grammaticalCase);
+
+  return declined.join(' ');
+}
+
 const DOCUMENTS_TO_GENERATE = [
   { name: 'eval', filename: 'Оценочный_лист_заполнен.docx', label: 'Оценочный лист' },
   { name: 'comp', filename: 'Лист_компетенций_заполнен.docx', label: 'Лист компетенций' },
@@ -435,7 +508,11 @@ function buildGenerationContext(userData) {
 
   const baseMapping = {
     '{{STUDENT_FIO}}': userData.studentFio,
+    '{{STUDENT_FIO_GENITIVE}}': declineFullName(userData.studentFio, 'genitive'),
+    '{{STUDENT_FIO_DATIVE}}': declineFullName(userData.studentFio, 'dative'),
     '{{SUPERVISOR_FIO}}': userData.supervisorFio,
+    '{{SUPERVISOR_FIO_GENITIVE}}': declineFullName(userData.supervisorFio, 'genitive'),
+    '{{SUPERVISOR_FIO_DATIVE}}': declineFullName(userData.supervisorFio, 'dative'),
     '{{DATE_START}}': formatDate(userData.dateStart),
     '{{DATE_END}}': formatDate(userData.dateEnd),
     '{{SEMESTER}}': String(userData.semester),

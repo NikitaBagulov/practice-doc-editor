@@ -10,14 +10,39 @@ const DocxBuilder = {
     return Array.from(runs).map(r => this._getRunText(r)).join('');
   },
 
-  _replaceInParagraph(p, mapping) {
+  _getContextValue(key, mapping, contextText) {
+    const text = contextText.toLowerCase();
+
+    if (key === '{{STUDENT_FIO}}') {
+      if (text.includes('студенту') || text.includes('магистранту')) {
+        return mapping['{{STUDENT_FIO_DATIVE}}'] || mapping[key];
+      }
+      if (text.includes('студента') || text.includes('магистранта')) {
+        return mapping['{{STUDENT_FIO_GENITIVE}}'] || mapping[key];
+      }
+    }
+
+    if (key === '{{SUPERVISOR_FIO}}') {
+      if (text.includes('руководителю')) {
+        return mapping['{{SUPERVISOR_FIO_DATIVE}}'] || mapping[key];
+      }
+      if (text.includes('руководителя')) {
+        return mapping['{{SUPERVISOR_FIO_GENITIVE}}'] || mapping[key];
+      }
+    }
+
+    return mapping[key];
+  },
+
+  _replaceInParagraph(p, mapping, contextText = null) {
     const fullText = this._getParagraphText(p);
+    const replacementContext = contextText || fullText;
     let newText = fullText;
     let hasChanges = false;
 
     for (const [key, val] of Object.entries(mapping)) {
       if (newText.includes(key)) {
-        newText = newText.replaceAll(key, val);
+        newText = newText.replaceAll(key, this._getContextValue(key, mapping, replacementContext));
         hasChanges = true;
       }
     }
@@ -47,8 +72,9 @@ const DocxBuilder = {
 
   _replaceInCell(cell, mapping) {
     const ps = cell.getElementsByTagNameNS(NS, 'p');
+    const cellText = Array.from(ps).map(p => this._getParagraphText(p)).join(' ');
     for (const p of Array.from(ps)) {
-      this._replaceInParagraph(p, mapping);
+      this._replaceInParagraph(p, mapping, cellText);
     }
   },
 
@@ -68,10 +94,14 @@ const DocxBuilder = {
       this._replaceInTable(table, mapping);
     }
 
-    const ps = body.getElementsByTagNameNS(NS, 'p');
-    for (const p of Array.from(ps)) {
+    const ps = Array.from(body.getElementsByTagNameNS(NS, 'p'));
+    for (let i = 0; i < ps.length; i++) {
+      const p = ps[i];
       if (!this._isInsideTable(p)) {
-        this._replaceInParagraph(p, mapping);
+        const context = ps.slice(Math.max(0, i - 2), i + 4)
+          .map(item => this._getParagraphText(item))
+          .join(' ');
+        this._replaceInParagraph(p, mapping, context);
       }
     }
   },
