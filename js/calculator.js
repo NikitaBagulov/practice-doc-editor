@@ -21,16 +21,67 @@ const Calculator = {
     return results;
   },
 
-  computeCompetenceTotals(compRows, scoreItemsByScoreKey) {
+  computeCompetenceTotals(compRows, scoreItems) {
     const totals = {};
     for (const row of compRows) {
       let sum = 0;
-      for (const sk of row.scoreKeys) {
-        sum += (scoreItemsByScoreKey[sk] || 0);
+      for (let i = 0; i < row.scoreKeys.length; i++) {
+        sum += this.findCompetenceScoreValue(row, i, scoreItems);
       }
       totals[row.competence] = (totals[row.competence] || 0) + sum;
     }
     return totals;
+  },
+
+  getCandidateRowKeys(row, scoreIndex) {
+    const rowKeys = row.rowKeys && row.rowKeys.length ? row.rowKeys : [row.rowKey];
+    if (rowKeys.length > 1 && scoreIndex < rowKeys.length) {
+      return [rowKeys[scoreIndex]];
+    }
+    return rowKeys;
+  },
+
+  normCriteria(text) {
+    return (text || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  },
+
+  criteriaMatches(a, b) {
+    const left = this.normCriteria(a);
+    const right = this.normCriteria(b);
+    if (!left || !right) return false;
+    return left.includes(right) || right.includes(left);
+  },
+
+  findCompetenceScoreValue(row, scoreIndex, scoreItems) {
+    const scoreKey = row.scoreKeys[scoreIndex];
+    const candidateRowKeys = this.getCandidateRowKeys(row, scoreIndex);
+    const candidates = scoreItems.filter(item => candidateRowKeys.includes(item.rowKey));
+    const criteriaBlock = row.criteriaBlocks && row.criteriaBlocks[scoreIndex];
+
+    for (const item of candidates) {
+      if (item.values && item.values[scoreKey] !== undefined) {
+        return item.values[scoreKey] || 0;
+      }
+    }
+
+    if (criteriaBlock) {
+      for (const item of candidates) {
+        const blocks = item.criteriaBlocks || [];
+        for (let i = 0; i < blocks.length; i++) {
+          if (this.criteriaMatches(blocks[i], criteriaBlock)) {
+            const key = item.scoreKeys[i];
+            return (item.values && item.values[key]) || 0;
+          }
+        }
+      }
+    }
+
+    if (candidates.length === 1 && candidates[0].scoreKeys.length === 1) {
+      const key = candidates[0].scoreKeys[0];
+      return (candidates[0].values && candidates[0].values[key]) || 0;
+    }
+
+    return 0;
   },
 
   computeCompetenceLevels(compTotals, semester, config) {
@@ -75,26 +126,5 @@ const Calculator = {
     }
 
     return 'не зачтено';
-  },
-
-  buildScoreMapByRowKey(scoreItems) {
-    const map = {};
-    for (const item of scoreItems) {
-      map[item.rowKey] = {};
-      for (const sk of item.scoreKeys) {
-        map[item.rowKey][sk] = item.values[sk] || 0;
-      }
-    }
-    return map;
-  },
-
-  buildScoreMapByScoreKey(scoreItems) {
-    const map = {};
-    for (const item of scoreItems) {
-      for (const sk of item.scoreKeys) {
-        map[sk] = item.values[sk] || 0;
-      }
-    }
-    return map;
   }
 };

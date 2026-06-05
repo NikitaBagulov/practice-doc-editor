@@ -243,8 +243,7 @@ function recalculateAll() {
   const stageResults = Calculator.computeStageResults(stageSums, thresholds);
 
   // 2. Competence totals
-  const scoreByScoreKey = Calculator.buildScoreMapByScoreKey(appState.scoreItems);
-  const compTotals = Calculator.computeCompetenceTotals(appState.compRows, scoreByScoreKey);
+  const compTotals = Calculator.computeCompetenceTotals(appState.compRows, appState.scoreItems);
   const compLevels = Calculator.computeCompetenceLevels(compTotals, String(semester), PRACTICE_CONFIG);
   const totalSum = Object.values(compTotals).reduce((a, b) => a + b, 0);
 
@@ -401,12 +400,10 @@ async function handleGenerate() {
     if (!semConfig) throw new Error('Нет конфигурации для семестра ' + semester);
 
     const thresholds = semConfig.stage_thresholds || {};
-    const scoreByScoreKey = Calculator.buildScoreMapByScoreKey(appState.scoreItems);
-
     // Stage calculations
     const stageSums = Calculator.computeStageSums(appState.scoreItems);
     const stageResults = Calculator.computeStageResults(stageSums, thresholds);
-    const compTotals = Calculator.computeCompetenceTotals(appState.compRows, scoreByScoreKey);
+    const compTotals = Calculator.computeCompetenceTotals(appState.compRows, appState.scoreItems);
     const compLevels = Calculator.computeCompetenceLevels(compTotals, String(semester), PRACTICE_CONFIG);
     const totalSum = Object.values(compTotals).reduce((a, b) => a + b, 0);
     const final = Calculator.computeFinalResult(stageResults, compLevels, semester, semConfig.final_rules || {});
@@ -473,7 +470,7 @@ async function handleGenerate() {
     const compZip = await DocxBuilder.generateDoc(appState.zips.comp, compMappingDoc);
     const compXmlText = await compZip.file('word/document.xml').async('string');
     const compXmlDoc = new DOMParser().parseFromString(compXmlText, 'text/xml');
-    fillScoreCellsByKey(compXmlDoc, appState.scoreItems);
+    fillScoreCellsByKey(compXmlDoc, appState.compRows, appState.scoreItems);
     DocxBuilder._replaceAllInDoc(compXmlDoc, compMapping);
     const newCompXml = serializer.serializeToString(compXmlDoc);
     compZip.file('word/document.xml', newCompXml);
@@ -539,16 +536,48 @@ async function fillScoreCellsInXml(xmlDoc, scoreItems, scoreHeader) {
   }
 }
 
-function fillScoreCellsByKey(xmlDoc, scoreItems) {
+function replaceScorePlaceholdersInCell(cell, values) {
+  if (!values.length) return;
+
+  let valueIndex = 0;
+  const ps = cell.getElementsByTagNameNS(NS, 'p');
+
+  for (const p of Array.from(ps)) {
+    const fullText = DocxBuilder._getParagraphText(p);
+    if (!TemplateLoader.extractScoreKeys(fullText).length) continue;
+
+    const newText = fullText.replace(/\{\{SCORE(?:_\d+)?\}\}/g, () => {
+      const value = values[valueIndex] !== undefined ? values[valueIndex] : 0;
+      valueIndex++;
+      return String(value);
+    });
+
+    const runs = Array.from(p.getElementsByTagNameNS(NS, 'r'));
+    for (const r of runs) {
+      const ts = r.getElementsByTagNameNS(NS, 't');
+      for (const t of Array.from(ts)) {
+        t.textContent = '';
+      }
+    }
+
+    if (runs.length > 0) {
+      const firstT = runs[0].getElementsByTagNameNS(NS, 't');
+      if (firstT.length > 0) {
+        firstT[0].textContent = newText;
+      } else {
+        const tEl = p.ownerDocument.createElementNS(NS, 't');
+        tEl.textContent = newText;
+        runs[0].appendChild(tEl);
+      }
+    }
+  }
+}
+
+function fillScoreCellsByKey(xmlDoc, compRows, scoreItems) {
   const tables = xmlDoc.getElementsByTagNameNS(NS, 'tbl');
   if (!tables.length) return;
 
-  const scoreKeyValues = {};
-  for (const item of scoreItems) {
-    for (const sk of item.scoreKeys) {
-      scoreKeyValues[sk] = String(item.values[sk] || 0);
-    }
-  }
+  let compRowIndex = 0;
 
   for (let ti = 0; ti < tables.length; ti++) {
     const rows = tables[ti].getElementsByTagNameNS(NS, 'tr');
@@ -559,15 +588,17 @@ function fillScoreCellsByKey(xmlDoc, scoreItems) {
         const cellText = TemplateLoader.getCellText(cell);
         const scoreKeys = TemplateLoader.extractScoreKeys(cellText);
         if (!scoreKeys.length) continue;
-        const mapping = {};
-        for (const sk of scoreKeys) {
-          if (scoreKeyValues[sk] !== undefined) {
-            mapping[sk] = scoreKeyValues[sk];
-          }
-        }
-        if (Object.keys(mapping).length > 0) {
-          DocxBuilder._replaceInCell(cell, mapping);
-        }
+
+        const compRow = compRows[compRowIndex];
+        if (!compRow) return;
+        compRowIndex++;
+
+        if (scoreKeys.some(sk => sk.includes('SUM') || sk.includes('LEVEL'))) continue;
+
+        const values = compRow.scoreKeys.map((_, index) => (
+          Calculator.findCompetenceScoreValue(compRow, index, scoreItems)
+        ));
+        replaceScorePlaceholdersInCell(cell, values);
       }
     }
   }

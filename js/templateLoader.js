@@ -51,6 +51,27 @@ const TemplateLoader = {
     return keys;
   },
 
+  splitCriteriaBlocks(text, expectedCount) {
+    const normalized = text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!normalized || !expectedCount) return [];
+
+    const starts = [];
+    const re = /(?:^|\s)(2:)/g;
+    let m;
+    while ((m = re.exec(normalized)) !== null) {
+      starts.push(m.index + (normalized[m.index] === ' ' ? 1 : 0));
+    }
+
+    if (starts.length <= 1) return [normalized];
+
+    const blocks = starts.map((start, index) => {
+      const end = starts[index + 1] || normalized.length;
+      return normalized.slice(start, end).trim();
+    });
+
+    return blocks.slice(0, expectedCount);
+  },
+
   getRowText(row) {
     const cells = row.getElementsByTagNameNS(NS, 'tc');
     return Array.from(cells).map(c => this.getCellText(c)).join(' ');
@@ -143,7 +164,8 @@ const TemplateLoader = {
         stage: currentStage || '?',
         scoreKeys,
         originalText: scoreCellText,
-        criteriaText
+        criteriaText,
+        criteriaBlocks: this.splitCriteriaBlocks(criteriaText, scoreKeys.length)
       });
     }
 
@@ -161,6 +183,7 @@ const TemplateLoader = {
     const table = tables[0];
     const scoreCol = this.findColumnByHeader(table, 'Балл');
     if (scoreCol < 0) throw new Error('Не найдена колонка "Балл" в листе компетенций');
+    const criteriaCol = this.findColumnByHeader(table, 'Критери');
 
     const rows = table.getElementsByTagNameNS(NS, 'tr');
     const compRows = [];
@@ -196,13 +219,21 @@ const TemplateLoader = {
       const labelText = dashItems[0];
       const rowKey = this.norm(labelText);
 
+      let criteriaText = '';
+      if (criteriaCol >= 0 && criteriaCol < cells.length) {
+        criteriaText = this.getCellText(cells[criteriaCol]);
+      }
+
       if (scoreKeys.some(sk => sk.includes('SUM') || sk.includes('LEVEL'))) continue;
 
       compRows.push({
         rowKey,
+        rowKeys: dashItems.map(item => this.norm(item)),
         label: labelText.replace(/^- /, '').trim(),
         competence: currentComp,
-        scoreKeys
+        scoreKeys,
+        criteriaText,
+        criteriaBlocks: this.splitCriteriaBlocks(criteriaText, scoreKeys.length)
       });
     }
 
