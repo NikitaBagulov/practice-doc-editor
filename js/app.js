@@ -633,23 +633,36 @@ async function handlePreview(name) {
 
   title.textContent = 'Предпросмотр: ' + doc.label;
   panel.hidden = false;
-  content.innerHTML = '<div class="preview-document"><p>Формирование предпросмотра...</p></div>';
+  content.innerHTML = '<div class="preview-message">Формирование предпросмотра...</div>';
   setStatus('generate-status', 'Формирование предпросмотра: ' + doc.label + '...', 'info');
 
   try {
-    if (!window.mammoth) {
+    if (!window.docx || !window.docx.renderAsync) {
       throw new Error('Библиотека предпросмотра не загружена. Проверьте подключение к интернету и обновите страницу.');
     }
 
     const context = await createGenerationContext();
     const zip = await generateDocumentZip(name, context);
     const arrayBuffer = await zip.generateAsync({ type: 'arraybuffer' });
-    const result = await mammoth.convertToHtml({ arrayBuffer });
 
-    content.innerHTML = '<div class="preview-document">' + (result.value || '<p>Нет содержимого для предпросмотра.</p>') + '</div>';
+    content.innerHTML = '';
+    await window.docx.renderAsync(arrayBuffer, content, null, {
+      className: 'docx-preview-document',
+      inWrapper: true,
+      ignoreWidth: false,
+      ignoreHeight: false,
+      ignoreFonts: false,
+      breakPages: true,
+      renderHeaders: true,
+      renderFooters: true,
+      renderFootnotes: true,
+      renderEndnotes: true,
+      useBase64URL: true
+    });
+
     setStatus('generate-status', 'Предпросмотр сформирован: ' + doc.label + '.', 'success');
   } catch (e) {
-    content.innerHTML = '<div class="preview-document"><p>Ошибка предпросмотра: ' + e.message + '</p></div>';
+    content.innerHTML = '<div class="preview-message">Ошибка предпросмотра: ' + e.message + '</div>';
     setStatus('generate-status', 'Ошибка: ' + e.message, 'error');
     console.error(e);
   }
