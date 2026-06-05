@@ -22,7 +22,10 @@ function bindEvents() {
   document.getElementById('input-date-end').addEventListener('input', onUserDataChange);
   document.getElementById('input-semester').addEventListener('input', onUserDataChange);
 
-  document.getElementById('btn-generate').addEventListener('click', handleGenerate);
+  document.getElementById('btn-generate-all').addEventListener('click', handleGenerateAll);
+  document.querySelectorAll('[data-doc]').forEach(btn => {
+    btn.addEventListener('click', () => handleGenerateOne(btn.dataset.doc));
+  });
 }
 
 function loadSavedData() {
@@ -392,114 +395,142 @@ function formatDate(dateStr) {
   return month ? '«' + d + '» ' + month + ' ' + y + ' г.' : dateStr;
 }
 
-async function handleGenerate() {
+const DOCUMENTS_TO_GENERATE = [
+  { name: 'eval', filename: 'Оценочный_лист_заполнен.docx', label: 'Оценочный лист' },
+  { name: 'comp', filename: 'Лист_компетенций_заполнен.docx', label: 'Лист компетенций' },
+  { name: 'review', filename: 'Отзыв_заполнен.docx', label: 'Отзыв' },
+  { name: 'task', filename: 'Индивидуальное_задание_заполнено.docx', label: 'Индивидуальное задание' },
+  { name: 'plan', filename: 'План_график_заполнен.docx', label: 'План-график' }
+];
+
+function getDocumentConfig(name) {
+  return DOCUMENTS_TO_GENERATE.find(doc => doc.name === name);
+}
+
+function ensureCanGenerate() {
   if (!appState.loaded.eval) {
-    setStatus('generate-status', 'Сначала загрузите шаблоны.', 'error');
-    return;
+    throw new Error('Сначала загрузите шаблоны.');
   }
 
   const userData = getUserData();
   if (!userData.studentFio || !userData.supervisorFio) {
-    setStatus('generate-status', 'Заполните ФИО магистранта и руководителя.', 'error');
-    return;
+    throw new Error('Заполните ФИО магистранта и руководителя.');
   }
 
-  setStatus('generate-status', 'Формирование документов...', 'info');
+  return userData;
+}
+
+function buildGenerationContext(userData) {
+  const semester = userData.semester;
+  const semConfig = PRACTICE_CONFIG.semesters[semester];
+  if (!semConfig) throw new Error('Нет конфигурации для семестра ' + semester);
+
+  const thresholds = semConfig.stage_thresholds || {};
+  const stageSums = Calculator.computeStageSums(appState.scoreItems);
+  const stageResults = Calculator.computeStageResults(stageSums, thresholds);
+  const compTotals = Calculator.computeCompetenceTotals(appState.compRows, appState.scoreItems);
+  const compLevels = Calculator.computeCompetenceLevels(compTotals, String(semester), PRACTICE_CONFIG);
+  const totalSum = Object.values(compTotals).reduce((a, b) => a + b, 0);
+  const final = Calculator.computeFinalResult(stageResults, compLevels, semester, semConfig.final_rules || {});
+
+  const baseMapping = {
+    '{{STUDENT_FIO}}': userData.studentFio,
+    '{{SUPERVISOR_FIO}}': userData.supervisorFio,
+    '{{DATE_START}}': formatDate(userData.dateStart),
+    '{{DATE_END}}': formatDate(userData.dateEnd),
+    '{{SEMESTER}}': String(userData.semester),
+    '{{STUDY_YEAR}}': String(userData.studyYear)
+  };
+
+  const stageMapping = {
+    '{{P_SUM}}': String(stageSums['P']),
+    '{{O_SUM}}': String(stageSums['O']),
+    '{{Z_SUM}}': String(stageSums['Z']),
+    '{{P_RESULT}}': stageResults['P'],
+    '{{O_RESULT}}': stageResults['O'],
+    '{{Z_RESULT}}': stageResults['Z'],
+    '{{TOTAL_SUM}}': String(totalSum),
+    '{{FINAL_RESULT}}': final
+  };
+
+  const compMapping = {};
+  for (const code of Object.keys(compTotals)) {
+    compMapping[codeToSumKey(code)] = String(compTotals[code]);
+    compMapping[codeToLevelKey(code)] = compLevels[code] || '—';
+  }
+
+  return {
+    baseMapping,
+    compMapping,
+    fullMapping: Object.assign({}, baseMapping, stageMapping, compMapping)
+  };
+}
+
+async function generateEvalZip(context) {
+  const zip = await DocxBuilder.generateDoc(appState.zips.eval, context.baseMapping);
+  const xmlText = await zip.file('word/document.xml').async('string');
+  const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
+  await fillScoreCellsInXml(xmlDoc, appState.scoreItems, 'Балл');
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+  return zip;
+}
+
+async function generateCompZip(context) {
+  const zip = await DocxBuilder.generateDoc(appState.zips.comp, context.baseMapping);
+  const xmlText = await zip.file('word/document.xml').async('string');
+  const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml');
+  fillScoreCellsByKey(xmlDoc, appState.compRows, appState.scoreItems);
+  DocxBuilder._replaceAllInDoc(xmlDoc, context.compMapping);
+  zip.file('word/document.xml', new XMLSerializer().serializeToString(xmlDoc));
+  return zip;
+}
+
+async function generateDocumentZip(name, context) {
+  if (name === 'eval') return generateEvalZip(context);
+  if (name === 'comp') return generateCompZip(context);
+  if (!appState.zips[name]) throw new Error('Шаблон не загружен: ' + name);
+  return DocxBuilder.generateDoc(appState.zips[name], context.fullMapping);
+}
+
+async function createGenerationContext() {
+  const userData = ensureCanGenerate();
+  return buildGenerationContext(userData);
+}
+
+async function handleGenerateOne(name) {
+  const doc = getDocumentConfig(name);
+  if (!doc) return;
+
+  setStatus('generate-status', 'Формирование документа: ' + doc.label + '...', 'info');
 
   try {
-    const semester = userData.semester;
-    const semConfig = PRACTICE_CONFIG.semesters[semester];
-    if (!semConfig) throw new Error('Нет конфигурации для семестра ' + semester);
+    const context = await createGenerationContext();
+    const zip = await generateDocumentZip(name, context);
+    const blob = await zip.generateAsync({ type: 'blob' });
+    saveAs(blob, doc.filename);
+    setStatus('generate-status', 'Документ сформирован: ' + doc.label + '.', 'success');
+  } catch (e) {
+    setStatus('generate-status', 'Ошибка: ' + e.message, 'error');
+    console.error(e);
+  }
+}
 
-    const thresholds = semConfig.stage_thresholds || {};
-    // Stage calculations
-    const stageSums = Calculator.computeStageSums(appState.scoreItems);
-    const stageResults = Calculator.computeStageResults(stageSums, thresholds);
-    const compTotals = Calculator.computeCompetenceTotals(appState.compRows, appState.scoreItems);
-    const compLevels = Calculator.computeCompetenceLevels(compTotals, String(semester), PRACTICE_CONFIG);
-    const totalSum = Object.values(compTotals).reduce((a, b) => a + b, 0);
-    const final = Calculator.computeFinalResult(stageResults, compLevels, semester, semConfig.final_rules || {});
+async function handleGenerateAll() {
+  setStatus('generate-status', 'Формирование архива документов...', 'info');
 
-    // Base mapping for all docs
-    const baseMapping = {
-      '{{STUDENT_FIO}}': userData.studentFio,
-      '{{SUPERVISOR_FIO}}': userData.supervisorFio,
-      '{{DATE_START}}': formatDate(userData.dateStart),
-      '{{DATE_END}}': formatDate(userData.dateEnd),
-      '{{SEMESTER}}': String(userData.semester),
-      '{{STUDY_YEAR}}': String(userData.studyYear)
-    };
+  try {
+    const context = await createGenerationContext();
+    const bundle = new JSZip();
 
-    // Stage results mapping
-    const stageMapping = {
-      '{{P_SUM}}': String(stageSums['P']),
-      '{{O_SUM}}': String(stageSums['O']),
-      '{{Z_SUM}}': String(stageSums['Z']),
-      '{{P_RESULT}}': stageResults['P'],
-      '{{O_RESULT}}': stageResults['O'],
-      '{{Z_RESULT}}': stageResults['Z'],
-      '{{TOTAL_SUM}}': String(totalSum),
-      '{{FINAL_RESULT}}': final
-    };
-
-    // Competence mapping
-    const compMapping = {};
-    for (const code of Object.keys(compTotals)) {
-      compMapping[codeToSumKey(code)] = String(compTotals[code]);
-      compMapping[codeToLevelKey(code)] = compLevels[code] || '—';
+    for (const doc of DOCUMENTS_TO_GENERATE) {
+      const zip = await generateDocumentZip(doc.name, context);
+      const bytes = await zip.generateAsync({ type: 'uint8array' });
+      bundle.file(doc.filename, bytes);
     }
 
-    // Full mapping for review & base docs
-    const fullMapping = Object.assign({}, baseMapping, stageMapping, compMapping);
-
-    // --- Generate each document ---
-    const filesToGenerate = [
-      { name: 'eval', zip: appState.zips.eval, mapping: null, filename: 'Оценочный_лист_заполнен.docx' },
-      { name: 'comp', zip: appState.zips.comp, mapping: null, filename: 'Лист_компетенций_заполнен.docx' },
-      { name: 'review', zip: appState.zips.review, mapping: fullMapping, filename: 'Отзыв_заполнен.docx' },
-      { name: 'task', zip: appState.zips.task, mapping: fullMapping, filename: 'Индивидуальное_задание_заполнено.docx' },
-      { name: 'plan', zip: appState.zips.plan, mapping: fullMapping, filename: 'План_график_заполнен.docx' }
-    ];
-
-    // For eval and comp, we need base mapping + score replacements
-    const evalMapping = Object.assign({}, baseMapping);
-    const compMappingDoc = Object.assign({}, baseMapping);
-
-    // Process eval scores
-    const evalZip = await DocxBuilder.generateDoc(appState.zips.eval, evalMapping);
-    // Fill score cells for eval template
-    const evalXmlText = await evalZip.file('word/document.xml').async('string');
-    const evalXmlDoc = new DOMParser().parseFromString(evalXmlText, 'text/xml');
-    await fillScoreCellsInXml(evalXmlDoc, appState.scoreItems, 'Балл');
-    const serializer = new XMLSerializer();
-    const newEvalXml = serializer.serializeToString(evalXmlDoc);
-    evalZip.file('word/document.xml', newEvalXml);
-
-    const evalBlob = await evalZip.generateAsync({ type: 'blob' });
-    saveAs(evalBlob, 'Оценочный_лист_заполнен.docx');
-
-    // Process comp scores
-    const compZip = await DocxBuilder.generateDoc(appState.zips.comp, compMappingDoc);
-    const compXmlText = await compZip.file('word/document.xml').async('string');
-    const compXmlDoc = new DOMParser().parseFromString(compXmlText, 'text/xml');
-    fillScoreCellsByKey(compXmlDoc, appState.compRows, appState.scoreItems);
-    DocxBuilder._replaceAllInDoc(compXmlDoc, compMapping);
-    const newCompXml = serializer.serializeToString(compXmlDoc);
-    compZip.file('word/document.xml', newCompXml);
-
-    const compBlob = await compZip.generateAsync({ type: 'blob' });
-    saveAs(compBlob, 'Лист_компетенций_заполнен.docx');
-
-    // Generate other docs
-    for (const f of filesToGenerate) {
-      if (f.name === 'eval' || f.name === 'comp') continue;
-      const zip = await DocxBuilder.generateDoc(f.zip, f.mapping);
-      const blob = await zip.generateAsync({ type: 'blob' });
-      saveAs(blob, f.filename);
-    }
-
-    setStatus('generate-status', 'Все документы сформированы и скачаны.', 'success');
-
+    const blob = await bundle.generateAsync({ type: 'blob' });
+    saveAs(blob, 'Документы_практики.zip');
+    setStatus('generate-status', 'Архив со всеми документами сформирован.', 'success');
   } catch (e) {
     setStatus('generate-status', 'Ошибка: ' + e.message, 'error');
     console.error(e);

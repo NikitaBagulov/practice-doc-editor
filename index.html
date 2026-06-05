@@ -75,7 +75,17 @@
     </section>
 
     <section id="section-generate">
-      <button id="btn-generate" class="btn btn-primary btn-large">Сформировать документы</button>
+      <h2>5. Документы</h2>
+      <div class="generate-actions">
+        <button id="btn-generate-all" class="btn btn-primary btn-large">Скачать все документы</button>
+        <div class="generate-grid">
+          <button class="btn btn-secondary" data-doc="eval">Оценочный лист</button>
+          <button class="btn btn-secondary" data-doc="comp">Лист компетенций</button>
+          <button class="btn btn-secondary" data-doc="review">Отзыв</button>
+          <button class="btn btn-secondary" data-doc="task">Индивидуальное задание</button>
+          <button class="btn btn-secondary" data-doc="plan">План-график</button>
+        </div>
+      </div>
       <div id="generate-status" class="status-msg"></div>
     </section>
   </div>
