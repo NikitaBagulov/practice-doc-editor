@@ -92,9 +92,12 @@ async function processLoadedFiles(files, restoreSaved = true) {
   const saved = restoreSaved ? Storage.load() : null;
   for (const item of appState.scoreItems) {
     item.values = {};
-    for (const sk of item.scoreKeys) {
+    item.scoreMaxes = item.scoreMaxes || item.scoreKeys.map(() => 2);
+    for (let i = 0; i < item.scoreKeys.length; i++) {
+      const sk = item.scoreKeys[i];
+      const max = item.scoreMaxes[i] !== undefined ? item.scoreMaxes[i] : 2;
       const savedVal = saved && saved.scoreValues && saved.scoreValues[item.rowKey + '|' + sk];
-      item.values[sk] = savedVal !== undefined ? savedVal : 0;
+      item.values[sk] = clampScoreValue(savedVal !== undefined ? savedVal : 0, max);
     }
   }
 
@@ -147,6 +150,11 @@ function getAllScoreValues() {
     }
   }
   return vals;
+}
+
+function clampScoreValue(value, max) {
+  const parsed = parseInt(value) || 0;
+  return Math.max(0, Math.min(parsed, max));
 }
 
 function renderScores() {
@@ -202,20 +210,24 @@ function renderScores() {
           row.appendChild(infoBtn);
         }
 
-        for (const sk of item.scoreKeys) {
+        item.scoreMaxes = item.scoreMaxes || item.scoreKeys.map(() => 2);
+
+        for (let i = 0; i < item.scoreKeys.length; i++) {
+          const sk = item.scoreKeys[i];
+          const max = item.scoreMaxes[i] !== undefined ? item.scoreMaxes[i] : 2;
+          item.values[sk] = clampScoreValue(item.values[sk], max);
+
           const input = document.createElement('input');
           input.type = 'number';
           input.min = 0;
-          input.max = 2;
+          input.max = max;
           input.value = item.values[sk] || 0;
           input.dataset.rowKey = item.rowKey;
           input.dataset.scoreKey = sk;
 
           input.addEventListener('input', () => {
-            const val = parseInt(input.value) || 0;
-            if (val < 0) input.value = 0;
-            if (val > 2) input.value = 2;
-            item.values[sk] = parseInt(input.value) || 0;
+            item.values[sk] = clampScoreValue(input.value, max);
+            input.value = item.values[sk];
             recalculateAll();
             Storage.save({ scoreItems: appState.scoreItems, scoreValues: getAllScoreValues() });
           });

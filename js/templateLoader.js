@@ -56,10 +56,19 @@ const TemplateLoader = {
     if (!normalized || !expectedCount) return [];
 
     const starts = [];
-    const re = /(?:^|\s)(2:)/g;
-    let m;
-    while ((m = re.exec(normalized)) !== null) {
-      starts.push(m.index + (normalized[m.index] === ' ' ? 1 : 0));
+    let cursor = 0;
+
+    while (starts.length < expectedCount && cursor < normalized.length) {
+      const nextTwo = normalized.indexOf('2:', cursor);
+      const nextOne = normalized.indexOf('1:', cursor);
+      const candidates = [nextTwo, nextOne].filter(index => index >= 0);
+      if (!candidates.length) break;
+
+      const start = Math.min(...candidates);
+      starts.push(start);
+
+      const zero = normalized.indexOf('0:', start);
+      cursor = zero >= 0 ? zero + 2 : start + 2;
     }
 
     if (starts.length <= 1) return [normalized];
@@ -70,6 +79,27 @@ const TemplateLoader = {
     });
 
     return blocks.slice(0, expectedCount);
+  },
+
+  getCriteriaMaxScore(text) {
+    const normalized = this.norm(text || '');
+    if (normalized.startsWith('2:')) return 2;
+    if (normalized.startsWith('1:')) return 1;
+    if (/(^|\s)2:/.test(normalized)) return 2;
+    if (/(^|\s)1:/.test(normalized)) return 1;
+    return 0;
+  },
+
+  getScoreMaxes(criteriaText, scoreKeys) {
+    const blocks = this.splitCriteriaBlocks(criteriaText, scoreKeys.length);
+    const maxes = [];
+
+    for (let i = 0; i < scoreKeys.length; i++) {
+      const block = blocks[i] || criteriaText;
+      maxes.push(this.getCriteriaMaxScore(block));
+    }
+
+    return maxes;
   },
 
   getRowText(row) {
@@ -163,6 +193,7 @@ const TemplateLoader = {
         label: labelText.replace(/^- /, '').trim(),
         stage: currentStage || '?',
         scoreKeys,
+        scoreMaxes: this.getScoreMaxes(criteriaText, scoreKeys),
         originalText: scoreCellText,
         criteriaText,
         criteriaBlocks: this.splitCriteriaBlocks(criteriaText, scoreKeys.length)

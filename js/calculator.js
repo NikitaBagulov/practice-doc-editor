@@ -4,12 +4,25 @@ const Calculator = {
     const sums = { P: 0, O: 0, Z: 0 };
     for (const item of scoreItems) {
       if (sums.hasOwnProperty(item.stage)) {
-        for (const sk of item.scoreKeys) {
-          sums[item.stage] += (item.values[sk] || 0);
+        for (let i = 0; i < item.scoreKeys.length; i++) {
+          sums[item.stage] += this.getScoreItemValue(item, i);
         }
       }
     }
     return sums;
+  },
+
+  clampScore(value, max) {
+    const parsed = parseInt(value) || 0;
+    return Math.max(0, Math.min(parsed, max));
+  },
+
+  getScoreItemValue(item, scoreIndex) {
+    const key = item.scoreKeys[scoreIndex];
+    const max = item.scoreMaxes && item.scoreMaxes[scoreIndex] !== undefined
+      ? item.scoreMaxes[scoreIndex]
+      : 2;
+    return this.clampScore(item.values && item.values[key], max);
   },
 
   computeStageResults(stageSums, thresholds) {
@@ -60,7 +73,8 @@ const Calculator = {
 
     for (const item of candidates) {
       if (item.values && item.values[scoreKey] !== undefined) {
-        return item.values[scoreKey] || 0;
+        const index = item.scoreKeys.indexOf(scoreKey);
+        return this.getScoreItemValue(item, index >= 0 ? index : 0);
       }
     }
 
@@ -69,16 +83,14 @@ const Calculator = {
         const blocks = item.criteriaBlocks || [];
         for (let i = 0; i < blocks.length; i++) {
           if (this.criteriaMatches(blocks[i], criteriaBlock)) {
-            const key = item.scoreKeys[i];
-            return (item.values && item.values[key]) || 0;
+            return this.getScoreItemValue(item, i);
           }
         }
       }
     }
 
     if (candidates.length === 1 && candidates[0].scoreKeys.length === 1) {
-      const key = candidates[0].scoreKeys[0];
-      return (candidates[0].values && candidates[0].values[key]) || 0;
+      return this.getScoreItemValue(candidates[0], 0);
     }
 
     return 0;
