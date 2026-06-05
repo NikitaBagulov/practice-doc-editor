@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -79,14 +80,51 @@
       <div class="generate-actions">
         <button id="btn-generate-all" class="btn btn-primary btn-large">Скачать все документы</button>
         <div class="generate-grid">
-          <button class="btn btn-secondary" data-doc="eval">Оценочный лист</button>
-          <button class="btn btn-secondary" data-doc="comp">Лист компетенций</button>
-          <button class="btn btn-secondary" data-doc="review">Отзыв</button>
-          <button class="btn btn-secondary" data-doc="task">Индивидуальное задание</button>
-          <button class="btn btn-secondary" data-doc="plan">План-график</button>
+          <div class="doc-card">
+            <div class="doc-title">Оценочный лист</div>
+            <div class="doc-actions">
+              <button class="btn btn-secondary" data-preview="eval">Предпросмотр</button>
+              <button class="btn btn-secondary" data-doc="eval">Скачать</button>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-title">Лист компетенций</div>
+            <div class="doc-actions">
+              <button class="btn btn-secondary" data-preview="comp">Предпросмотр</button>
+              <button class="btn btn-secondary" data-doc="comp">Скачать</button>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-title">Отзыв</div>
+            <div class="doc-actions">
+              <button class="btn btn-secondary" data-preview="review">Предпросмотр</button>
+              <button class="btn btn-secondary" data-doc="review">Скачать</button>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-title">Индивидуальное задание</div>
+            <div class="doc-actions">
+              <button class="btn btn-secondary" data-preview="task">Предпросмотр</button>
+              <button class="btn btn-secondary" data-doc="task">Скачать</button>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-title">План-график</div>
+            <div class="doc-actions">
+              <button class="btn btn-secondary" data-preview="plan">Предпросмотр</button>
+              <button class="btn btn-secondary" data-doc="plan">Скачать</button>
+            </div>
+          </div>
         </div>
       </div>
       <div id="generate-status" class="status-msg"></div>
+      <div id="preview-panel" class="preview-panel" hidden>
+        <div class="preview-header">
+          <h3 id="preview-title">Предпросмотр</h3>
+          <button id="btn-close-preview" class="btn btn-secondary" type="button">Закрыть</button>
+        </div>
+        <div id="preview-content" class="preview-content"></div>
+      </div>
     </section>
   </div>
 

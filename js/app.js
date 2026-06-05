@@ -26,6 +26,10 @@ function bindEvents() {
   document.querySelectorAll('[data-doc]').forEach(btn => {
     btn.addEventListener('click', () => handleGenerateOne(btn.dataset.doc));
   });
+  document.querySelectorAll('[data-preview]').forEach(btn => {
+    btn.addEventListener('click', () => handlePreview(btn.dataset.preview));
+  });
+  document.getElementById('btn-close-preview').addEventListener('click', closePreview);
 }
 
 function loadSavedData() {
@@ -609,6 +613,43 @@ async function handleGenerateAll() {
     saveAs(blob, 'Документы_практики.zip');
     setStatus('generate-status', 'Архив со всеми документами сформирован.', 'success');
   } catch (e) {
+    setStatus('generate-status', 'Ошибка: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+function closePreview() {
+  document.getElementById('preview-panel').hidden = true;
+  document.getElementById('preview-content').innerHTML = '';
+}
+
+async function handlePreview(name) {
+  const doc = getDocumentConfig(name);
+  if (!doc) return;
+
+  const panel = document.getElementById('preview-panel');
+  const title = document.getElementById('preview-title');
+  const content = document.getElementById('preview-content');
+
+  title.textContent = 'Предпросмотр: ' + doc.label;
+  panel.hidden = false;
+  content.innerHTML = '<div class="preview-document"><p>Формирование предпросмотра...</p></div>';
+  setStatus('generate-status', 'Формирование предпросмотра: ' + doc.label + '...', 'info');
+
+  try {
+    if (!window.mammoth) {
+      throw new Error('Библиотека предпросмотра не загружена. Проверьте подключение к интернету и обновите страницу.');
+    }
+
+    const context = await createGenerationContext();
+    const zip = await generateDocumentZip(name, context);
+    const arrayBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+    const result = await mammoth.convertToHtml({ arrayBuffer });
+
+    content.innerHTML = '<div class="preview-document">' + (result.value || '<p>Нет содержимого для предпросмотра.</p>') + '</div>';
+    setStatus('generate-status', 'Предпросмотр сформирован: ' + doc.label + '.', 'success');
+  } catch (e) {
+    content.innerHTML = '<div class="preview-document"><p>Ошибка предпросмотра: ' + e.message + '</p></div>';
     setStatus('generate-status', 'Ошибка: ' + e.message, 'error');
     console.error(e);
   }
