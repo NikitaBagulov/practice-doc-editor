@@ -10,6 +10,68 @@ const DocxBuilder = {
     return Array.from(runs).map(r => this._getRunText(r)).join('');
   },
 
+  _isFioKey(key) {
+    return key.includes('_FIO');
+  },
+
+  _removeChildrenByLocalName(el, localName) {
+    for (const child of Array.from(el.childNodes)) {
+      if (child.localName === localName) {
+        el.removeChild(child);
+      }
+    }
+  },
+
+  _styleFioRun(run) {
+    let rPr = Array.from(run.childNodes).find(node => node.localName === 'rPr');
+    if (!rPr) {
+      rPr = run.ownerDocument.createElementNS(NS, 'rPr');
+      run.insertBefore(rPr, run.firstChild);
+    }
+
+    this._removeChildrenByLocalName(rPr, 'b');
+    this._removeChildrenByLocalName(rPr, 'bCs');
+    this._removeChildrenByLocalName(rPr, 'u');
+
+    const underline = run.ownerDocument.createElementNS(NS, 'u');
+    underline.setAttributeNS(NS, 'w:val', 'single');
+    rPr.appendChild(underline);
+  },
+
+  _replaceParagraphWithSegments(p, segments) {
+    const oldRuns = Array.from(p.getElementsByTagNameNS(NS, 'r'));
+    const baseRun = oldRuns[0] || p.ownerDocument.createElementNS(NS, 'r');
+
+    for (const run of oldRuns) {
+      if (run.parentNode === p) {
+        p.removeChild(run);
+      }
+    }
+
+    for (const segment of segments) {
+      if (!segment.text) continue;
+
+      const run = baseRun.cloneNode(true);
+      for (const child of Array.from(run.childNodes)) {
+        if (child.localName !== 'rPr') {
+          run.removeChild(child);
+        }
+      }
+
+      if (segment.isFio) {
+        this._styleFioRun(run);
+      }
+
+      const textEl = p.ownerDocument.createElementNS(NS, 't');
+      textEl.textContent = segment.text;
+      if (/^\s|\s$/.test(segment.text)) {
+        textEl.setAttribute('xml:space', 'preserve');
+      }
+      run.appendChild(textEl);
+      p.appendChild(run);
+    }
+  },
+
   _getContextValue(key, mapping, contextText) {
     const text = contextText.toLowerCase();
 
@@ -37,37 +99,34 @@ const DocxBuilder = {
   _replaceInParagraph(p, mapping, contextText = null) {
     const fullText = this._getParagraphText(p);
     const replacementContext = contextText || fullText;
-    let newText = fullText;
+    let segments = [{ text: fullText, isFio: false }];
     let hasChanges = false;
 
     for (const [key, val] of Object.entries(mapping)) {
-      if (newText.includes(key)) {
-        newText = newText.replaceAll(key, this._getContextValue(key, mapping, replacementContext));
-        hasChanges = true;
+      const nextSegments = [];
+      for (const segment of segments) {
+        if (segment.isFio || !segment.text.includes(key)) {
+          nextSegments.push(segment);
+          continue;
+        }
+
+        const parts = segment.text.split(key);
+        const replacement = this._getContextValue(key, mapping, replacementContext);
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i]) {
+            nextSegments.push({ text: parts[i], isFio: false });
+          }
+          if (i < parts.length - 1) {
+            nextSegments.push({ text: replacement, isFio: this._isFioKey(key) });
+            hasChanges = true;
+          }
+        }
       }
+      segments = nextSegments;
     }
 
     if (!hasChanges) return;
-
-    const runs = Array.from(p.getElementsByTagNameNS(NS, 'r'));
-
-    for (const r of runs) {
-      const ts = r.getElementsByTagNameNS(NS, 't');
-      for (const t of Array.from(ts)) {
-        t.textContent = '';
-      }
-    }
-
-    if (runs.length > 0) {
-      const firstT = runs[0].getElementsByTagNameNS(NS, 't');
-      if (firstT.length > 0) {
-        firstT[0].textContent = newText;
-      } else {
-        const tEl = p.ownerDocument.createElementNS(NS, 't');
-        tEl.textContent = newText;
-        runs[0].appendChild(tEl);
-      }
-    }
+    this._replaceParagraphWithSegments(p, segments);
   },
 
   _replaceInCell(cell, mapping) {
