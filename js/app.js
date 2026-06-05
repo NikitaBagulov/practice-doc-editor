@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function bindEvents() {
   document.getElementById('btn-load-folder').addEventListener('click', handleLoadFromFolder);
-  document.getElementById('btn-load-all').addEventListener('click', handleLoadAll);
 
   document.getElementById('input-student-fio').addEventListener('input', onUserDataChange);
   document.getElementById('input-supervisor-fio').addEventListener('input', onUserDataChange);
@@ -137,37 +136,6 @@ async function handleLoadFromFolder(fresh = false) {
     setStatus('upload-status', 'Шаблоны загружены из папки templates/.', 'success');
   } catch (e) {
     setStatus('upload-status', 'Ошибка загрузки из папки: ' + e.message + '. Используйте ручную загрузку.', 'error');
-  }
-}
-
-async function handleLoadAll() {
-  const fileIds = ['file-eval', 'file-comp', 'file-review', 'file-task', 'file-plan', 'file-config'];
-  const files = {};
-  let allSelected = true;
-
-  for (const fid of fileIds) {
-    const input = document.getElementById(fid);
-    if (input.files && input.files[0]) {
-      const label = fid.replace('file-', '');
-      files[label] = input.files[0];
-    } else {
-      allSelected = false;
-    }
-  }
-
-  if (!allSelected) {
-    setStatus('upload-status', 'Выберите все 6 файлов (5 .docx + config.json)', 'error');
-    return;
-  }
-
-  setStatus('upload-status', 'Загрузка шаблонов...', 'info');
-
-  try {
-    await processLoadedFiles(files);
-    setStatus('upload-status', 'Все шаблоны загружены. Можно вводить баллы.', 'success');
-  } catch (e) {
-    setStatus('upload-status', 'Ошибка: ' + e.message, 'error');
-    console.error(e);
   }
 }
 
