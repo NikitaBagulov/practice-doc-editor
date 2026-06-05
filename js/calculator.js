@@ -61,15 +61,34 @@ const Calculator = {
     return rowKeys;
   },
 
+  compactRowKey(text) {
+    return (text || '').replace(/[^а-яёa-z0-9]+/gi, '').toLowerCase();
+  },
+
+  rowKeyMatches(a, b) {
+    const left = this.compactRowKey(a);
+    const right = this.compactRowKey(b);
+    if (!left || !right) return false;
+    return left.includes(right) || right.includes(left);
+  },
+
   normCriteria(text) {
     return (text || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  },
+
+  compactCriteria(text) {
+    return this.normCriteria(text).replace(/[^а-яёa-z0-9]+/gi, '');
   },
 
   criteriaMatches(a, b) {
     const left = this.normCriteria(a);
     const right = this.normCriteria(b);
     if (!left || !right) return false;
-    return left.includes(right) || right.includes(left);
+    if (left.includes(right) || right.includes(left)) return true;
+
+    const compactLeft = this.compactCriteria(a);
+    const compactRight = this.compactCriteria(b);
+    return compactLeft.includes(compactRight) || compactRight.includes(compactLeft);
   },
 
   findCompetenceScoreValue(row, scoreIndex, scoreItems) {
@@ -109,6 +128,13 @@ const Calculator = {
 
     if (candidates.length === 1 && candidates[0].scoreKeys.length === 1) {
       return this.getScoreItemValue(candidates[0], 0);
+    }
+
+    for (const item of scoreItems) {
+      if (!candidateRowKeys.some(rowKey => this.rowKeyMatches(rowKey, item.rowKey))) continue;
+      if (item.scoreKeys.length === 1) {
+        return this.getScoreItemValue(item, 0);
+      }
     }
 
     return 0;
