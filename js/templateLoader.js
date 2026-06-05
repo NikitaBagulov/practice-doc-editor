@@ -51,7 +51,7 @@ const TemplateLoader = {
     return keys;
   },
 
-  splitCriteriaBlocks(text, expectedCount) {
+  splitCriteriaBlocks(text, expectedCount = Infinity) {
     const normalized = text.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
     if (!normalized || !expectedCount) return [];
 
@@ -78,7 +78,7 @@ const TemplateLoader = {
       return normalized.slice(start, end).trim();
     });
 
-    return blocks.slice(0, expectedCount);
+    return Number.isFinite(expectedCount) ? blocks.slice(0, expectedCount) : blocks;
   },
 
   getCriteriaMaxScore(text) {
@@ -182,6 +182,7 @@ const TemplateLoader = {
 
       const labelText = dashItems[0];
       const rowKey = this.norm(labelText);
+      const scoreSlotCount = Math.max(scoreKeys.length, dashItems.length);
 
       let criteriaText = '';
       if (criteriaCol >= 0 && criteriaCol < cells.length) {
@@ -254,6 +255,8 @@ const TemplateLoader = {
       if (criteriaCol >= 0 && criteriaCol < cells.length) {
         criteriaText = this.getCellText(cells[criteriaCol]);
       }
+      const criteriaBlocks = this.splitCriteriaBlocks(criteriaText);
+      const scoreSlotCount = Math.max(scoreKeys.length, dashItems.length, criteriaBlocks.length);
 
       if (scoreKeys.some(sk => sk.includes('SUM') || sk.includes('LEVEL'))) continue;
 
@@ -263,8 +266,9 @@ const TemplateLoader = {
         label: labelText.replace(/^- /, '').trim(),
         competence: currentComp,
         scoreKeys,
+        scoreSlotCount,
         criteriaText,
-        criteriaBlocks: this.splitCriteriaBlocks(criteriaText, scoreKeys.length)
+        criteriaBlocks
       });
     }
 

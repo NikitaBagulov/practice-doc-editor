@@ -607,7 +607,13 @@ function fillScoreCellsByKey(xmlDoc, compRows, scoreItems) {
 
         if (scoreKeys.some(sk => sk.includes('SUM') || sk.includes('LEVEL'))) continue;
 
-        const values = compRow.scoreKeys.map((_, index) => (
+        const slotCount = Math.max(
+          compRow.scoreSlotCount || 0,
+          compRow.scoreKeys.length,
+          compRow.criteriaBlocks ? compRow.criteriaBlocks.length : 0,
+          compRow.rowKeys ? compRow.rowKeys.length : 0
+        );
+        const values = Array.from({ length: slotCount }, (_, index) => (
           Calculator.findCompetenceScoreValue(compRow, index, scoreItems)
         ));
         replaceScorePlaceholdersInCell(cell, values);

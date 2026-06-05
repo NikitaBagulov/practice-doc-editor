@@ -38,7 +38,14 @@ const Calculator = {
     const totals = {};
     for (const row of compRows) {
       let sum = 0;
-      for (let i = 0; i < row.scoreKeys.length; i++) {
+      const slotCount = Math.max(
+        row.scoreSlotCount || 0,
+        row.scoreKeys.length,
+        row.criteriaBlocks ? row.criteriaBlocks.length : 0,
+        row.rowKeys ? row.rowKeys.length : 0
+      );
+
+      for (let i = 0; i < slotCount; i++) {
         sum += this.findCompetenceScoreValue(row, i, scoreItems);
       }
       totals[row.competence] = (totals[row.competence] || 0) + sum;
@@ -71,13 +78,6 @@ const Calculator = {
     const candidates = scoreItems.filter(item => candidateRowKeys.includes(item.rowKey));
     const criteriaBlock = row.criteriaBlocks && row.criteriaBlocks[scoreIndex];
 
-    for (const item of candidates) {
-      if (item.values && item.values[scoreKey] !== undefined) {
-        const index = item.scoreKeys.indexOf(scoreKey);
-        return this.getScoreItemValue(item, index >= 0 ? index : 0);
-      }
-    }
-
     if (criteriaBlock) {
       for (const item of candidates) {
         const blocks = item.criteriaBlocks || [];
@@ -85,6 +85,24 @@ const Calculator = {
           if (this.criteriaMatches(blocks[i], criteriaBlock)) {
             return this.getScoreItemValue(item, i);
           }
+        }
+      }
+
+      for (const item of scoreItems) {
+        const blocks = item.criteriaBlocks || [];
+        for (let i = 0; i < blocks.length; i++) {
+          if (this.criteriaMatches(blocks[i], criteriaBlock)) {
+            return this.getScoreItemValue(item, i);
+          }
+        }
+      }
+    }
+
+    if (scoreKey) {
+      for (const item of candidates) {
+        if (item.values && item.values[scoreKey] !== undefined) {
+          const index = item.scoreKeys.indexOf(scoreKey);
+          return this.getScoreItemValue(item, index >= 0 ? index : 0);
         }
       }
     }
