@@ -228,7 +228,6 @@ const TemplateLoader = {
       const joined = this.norm(rowText);
 
       if (joined.includes('итого баллов')) continue;
-      if (this.isNotScored(rowText)) continue;
 
       const cells = row.getElementsByTagNameNS(NS, 'tc');
       for (const cell of cells) {
