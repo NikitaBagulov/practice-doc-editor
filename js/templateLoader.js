@@ -60,8 +60,8 @@ const TemplateLoader = {
     const items = [];
     for (const line of text.split(/\r?\n/)) {
       const trimmed = line.trim();
-      if (trimmed.startsWith('-')) {
-        items.push(trimmed);
+      if (/^[-\u00ad]\s*/.test(trimmed)) {
+        items.push(trimmed.replace(/^\u00ad\s*-?\s*/, '- '));
       }
     }
     return items;
